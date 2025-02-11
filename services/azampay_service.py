@@ -65,4 +65,21 @@ class AzamPayService:
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to initiate MNO Checkout: {e}")
             return None
+        
+    def forward_callback(self, callback_data):
+        """
+        Forward the callback data received from AzamPay to the frontend platform application's callback endpoint.
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        try:
+            response = requests.post(Config.CALLBACK_URL, json=callback_data, headers=headers, timeout=10)
+            response.raise_for_status()
+            logging.info("Callback forwarded to frontend platform successfully. Response: %s", response.json())
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logging.error("Failed to forward callback to frontend platform: %s", e)
+            return None
 

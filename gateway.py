@@ -10,7 +10,18 @@ logging.basicConfig(filename="logs/gateway.log", level=logging.INFO, format="%(a
 
 @gateway.route("/mno-checkout", methods=["POST"])
 def mno_checkout():
-    """Handle payment request from Laravel"""
+    """
+    Endpoint to handle payment initiation requests from the frontend application.
+    Expected JSON payload (from Frontend):
+    {
+        "accountNumber": "sender's number",
+        "amount": "1000",
+        "currency": "TZS",
+        "externalId": "TXN-12345",
+        "provider": "Airtel",
+        "additionalProperties": { ... } // optional
+    }
+    """
     data = request.get_json()
     
     account_number = data.get("accountNumber")
@@ -50,39 +61,46 @@ def checkout_callback():
     }
     
     This endpoint must be always available. It validates the payload, logs the data, and then
-    processes it (for example, by updating your system's transaction status).
+    the gateway forwards it to the frontend app.
     """
-    data = request.get_json()
-    if not data:
+    callback_data = request.get_json()
+    if not callback_data:
         gateway.logger.error("Callback received with no JSON payload.")
-        return jsonify({"error": "No JSON payload received"}), 400
+        return jsonify({"error": "No JSON payload received."}), 400
 
     # List of required fields
     required_fields = ["amount", "message", "msisdn", "operator", "reference", "transactionstatus", "utilityref"]
-    missing_fields = [field for field in required_fields if field not in data or not data[field]]
+    missing_fields = [field for field in required_fields if field not in callback_data or not callback_data[field]]
     if missing_fields:
         gateway.logger.error("Callback missing required fields: %s", ", ".join(missing_fields))
         return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     # Validate operator
     allowed_operators = ["Airtel", "Tigo", "Halopesa", "Azampesa", "Mpesa"]
-    if data.get("operator") not in allowed_operators:
-        gateway.logger.error("Invalid operator in callback: %s", data.get("operator"))
-        return jsonify({"error": f"Invalid operator: {data.get('operator')}. Allowed values: {', '.join(allowed_operators)}"}), 400
+    if callback_data.get("operator") not in allowed_operators:
+        gateway.logger.error("Invalid operator in callback: %s", callback_data.get("operator"))
+        return jsonify({"error": f"Invalid operator: {callback_data.get('operator')}. Allowed values: {', '.join(allowed_operators)}"}), 400
 
     # Validate transactionstatus is either "success" or "failure"
-    if data.get("transactionstatus") not in ["success", "failure"]:
-        gateway.logger.error("Invalid transaction status in callback: %s", data.get("transactionstatus"))
+    if callback_data.get("transactionstatus") not in ["success", "failure"]:
+        gateway.logger.error("Invalid transaction status in callback: %s", callback_data.get("transactionstatus"))
         return jsonify({"error": "Invalid transaction status. Must be 'success' or 'failure'"}), 400
 
     # Log the callback data
-    gateway.logger.info("Received AzamPay callback: %s", data)
+    gateway.logger.info("Received AzamPay callback: %s", callback_data)
 
-    # TODO: Process the callback data:
-    # e.g., update transaction status in your database, notify your Laravel gateway, etc.
-    # update_transaction_status(data["reference"], data["transactionstatus"])
-
-    return jsonify({"status": "success", "message": "Callback processed successfully"}), 200
+    # Forward the callback data to the Laravel application.
+    forward_result = azampay.forward_callback(callback_data)
+    if forward_result:
+        return jsonify({
+            "status": "success",
+            "message": "Callback processed and forwarded successfully."
+        }), 200
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to forward callback to Laravel."
+        }), 500
 
 if __name__ == "__main__":
     gateway.run(host="0.0.0.0", port=5000, debug=True)
