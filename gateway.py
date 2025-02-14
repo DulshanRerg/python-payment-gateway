@@ -23,6 +23,8 @@ def mno_checkout():
     }
     """
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON payload received"}), 400
     
     account_number = data.get("accountNumber")
     amount = data.get("amount")
@@ -33,10 +35,9 @@ def mno_checkout():
         return jsonify({"error": "Missing required fields"}), 400
 
     response = azampay.mno_checkout(account_number, amount, external_id, provider)
+    
 
     if response:
-        return jsonify({"message": "Payment initiated", "data": response}), 200
-    else:
         return jsonify({"error": "Failed to initiate payment"}), 500
 
 @gateway.route("/api/v1/Checkout/Callback", methods=["POST"])
