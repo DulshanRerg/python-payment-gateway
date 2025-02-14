@@ -36,8 +36,9 @@ def mno_checkout():
 
     response = azampay.mno_checkout(account_number, amount, external_id, provider)
     
-
     if response:
+        return jsonify(response), 200
+    else:
         return jsonify({"error": "Failed to initiate payment"}), 500
 
 @gateway.route("/api/v1/Checkout/Callback", methods=["POST"])
