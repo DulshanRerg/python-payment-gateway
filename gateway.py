@@ -103,6 +103,9 @@ def checkout_callback():
             "status": "error",
             "message": "Failed to forward callback to Laravel."
         }), 500
+@gateway.route("/")
+def home():
+    return "Hello, If you want to use this Payment API - send us a email via dulshanrerg01@duck.com!"
 
 if __name__ == "__main__":
     gateway.run(host="0.0.0.0", port=5000, debug=True)
